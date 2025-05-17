@@ -18,6 +18,8 @@ RUN npm run build
 
 ENV NODE_ENV=production
 
+RUN npx prisma generate
+
 # Expose the application port
 EXPOSE 3000
 
