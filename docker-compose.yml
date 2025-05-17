@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+    piconix-db:
+        container_name: piconix-db
+        image: postgres:13
+        restart: always
+        ports:
+            - 5436:5432
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: mlakaimati254
+            POSTGRES_DB: piconix
+        networks:
+            - piconix
+networks:
+    piconix:
