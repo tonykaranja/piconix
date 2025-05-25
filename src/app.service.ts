@@ -7,6 +7,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { Articles, BiasResponse, responseFormat } from './llama/biasDetector';
+import { chatWithF1Bot } from './openai/openai';
 
 const BiasDetection = z.object({
   biasedArticle: z.object({
@@ -136,24 +137,12 @@ export class AppService {
       const question = transcription.text;
 
       // Get answer from GPT-4
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content: "Provide concise, accurate answers to the input question."
-          },
-          {
-            role: "user",
-            content: question
-          }
-        ],
-      });
+      const answer = await chatWithF1Bot({ userQuestion: question, openai: this.openai });
 
       // Save question and answer to database
       const questionAndAnswer = {
         question: question,
-        answer: completion.choices[0].message.content || 'No answer',
+        answer: JSON.stringify(answer) || 'No answer',
         timestamp: new Date()
       };
       console.info('questionAndAnswer', questionAndAnswer);
@@ -166,19 +155,17 @@ export class AppService {
         // Continue execution even if DB save fails
       }
 
-      const answer = completion.choices[0].message.content;
-      if (!answer) {
-        throw new Error('Failed to generate answer');
-      }
-
       // Convert answer to speech
       const mp3 = await this.openai.audio.speech.create({
+        instructions: `given question: ${question} and input answer object, summarize the answer in a concise way`,
         model: "gpt-4o-mini-tts",
         voice: "alloy",
-        input: answer,
+        input: JSON.stringify(answer),
       });
 
-      return Buffer.from(await mp3.arrayBuffer());
+      const buffer = Buffer.from(await mp3.arrayBuffer());
+      await fs.writeFile(`${this.voiceCacheDir}/${question}.mp3`, buffer);
+      return buffer;
     } catch (error) {
       console.error('Error processing audio question:', error);
       throw new Error(`Failed to process audio question: ${error.message}`);

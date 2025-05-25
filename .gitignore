@@ -62,3 +62,5 @@ data/f1/*.sqlite3
 
 # Keep CSV files
 !data/f1/*.csv
+
+voice-cache/

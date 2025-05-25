@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -22,50 +16,50 @@ model Logs {
   message   String
   stack     String
   meta      Json?
-  timestamp DateTime @default(now()) @db.Timestamptz()
-  createdAt DateTime @default(now()) @db.Timestamptz()
-  updatedAt DateTime @updatedAt @db.Timestamptz()
+  timestamp DateTime @default(now()) @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
 }
 
 model QuestionAnswer {
   id        String   @id @default(uuid())
   question  String
   answer    String
-  timestamp DateTime @default(now()) @db.Timestamptz()
-  createdAt DateTime @default(now()) @db.Timestamptz()
-  updatedAt DateTime @updatedAt @db.Timestamptz()
+  timestamp DateTime @default(now()) @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
 }
 
 model Circuit {
-  id                String             @id
   url               String?
   name              String             @map("circuitName")
   locality          String?
   country           String?
   latitude          Float?
   longitude         Float?
-  races             Race[]
-  results           Result[]
+  createdAt         DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @db.Timestamptz(6)
+  id                String             @id
   pitStops          PitStop[]
   qualifyingResults QualifyingResult[]
-  createdAt         DateTime           @default(now()) @db.Timestamptz()
-  updatedAt         DateTime           @updatedAt @db.Timestamptz()
+  races             Race[]
+  results           Result[]
 
   @@index([name])
   @@index([country])
 }
 
 model Constructor {
-  id          String // changed from Int to String
   year        Int
   url         String?
-  name        String                @map("Name")
   nationality String?
-  results     Result[]
-  qualifying  QualifyingResult[]
+  createdAt   DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime              @updatedAt @db.Timestamptz(6)
+  name        String                @map("Name")
+  id          String
   standings   ConstructorStanding[]
-  createdAt   DateTime              @default(now()) @db.Timestamptz()
-  updatedAt   DateTime              @updatedAt @db.Timestamptz()
+  qualifying  QualifyingResult[]
+  results     Result[]
 
   @@id([id, year])
   @@index([name])
@@ -74,18 +68,18 @@ model Constructor {
 }
 
 model Driver {
-  id          String             @id // changed from Int to String and made primary key
   url         String?
   givenName   String
   familyName  String
   dateOfBirth DateTime
   nationality String?
-  results     Result[]
-  qualifying  QualifyingResult[]
-  pitStops    PitStop[]
+  createdAt   DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(6)
+  id          String             @id
   standings   DriverStanding[]
-  createdAt   DateTime           @default(now()) @db.Timestamptz()
-  updatedAt   DateTime           @updatedAt @db.Timestamptz()
+  pitStops    PitStop[]
+  qualifying  QualifyingResult[]
+  results     Result[]
 
   @@index([givenName, familyName])
   @@index([nationality])
@@ -95,16 +89,16 @@ model Driver {
 model Race {
   season               Int
   round                Int
-  circuit              Circuit               @relation(fields: [circuitId], references: [id])
-  circuitId            String
   raceDate             DateTime?
-  results              Result[]
-  qualifying           QualifyingResult[]
-  pitStops             PitStop[]
-  driverStandings      DriverStanding[]
+  createdAt            DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime              @updatedAt @db.Timestamptz(6)
+  circuitId            String
   constructorStandings ConstructorStanding[]
-  createdAt            DateTime              @default(now()) @db.Timestamptz()
-  updatedAt            DateTime              @updatedAt @db.Timestamptz()
+  driverStandings      DriverStanding[]
+  pitStops             PitStop[]
+  qualifying           QualifyingResult[]
+  circuit              Circuit               @relation(fields: [circuitId], references: [id])
+  results              Result[]
 
   @@id([season, round])
   @@index([circuitId])
@@ -114,11 +108,6 @@ model Race {
 model Result {
   season          Int
   round           Int
-  driver          Driver      @relation(fields: [driverId], references: [id])
-  driverId        String
-  constructor     Constructor @relation(fields: [constructorId, constructorYear], references: [id, year])
-  constructorId   String
-  constructorYear Int
   position        Int
   points          Float
   grid            Int
@@ -128,13 +117,18 @@ model Result {
   fastestLapTime  String?
   fastestLapLap   Int?
   averageSpeed    Float?
-  createdAt       DateTime    @default(now()) @db.Timestamptz()
-  updatedAt       DateTime    @updatedAt @db.Timestamptz()
-  Circuit         Circuit?    @relation(fields: [circuitId], references: [id])
+  createdAt       DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime    @updatedAt @db.Timestamptz(6)
+  constructorYear Int
   circuitId       String?
-  Race            Race?       @relation(fields: [raceSeason, raceRound], references: [season, round])
-  raceSeason      Int?
+  driverId        String
+  constructorId   String
   raceRound       Int?
+  raceSeason      Int?
+  Circuit         Circuit?    @relation(fields: [circuitId], references: [id])
+  constructor     Constructor @relation(fields: [constructorId, constructorYear], references: [id, year])
+  driver          Driver      @relation(fields: [driverId], references: [id])
+  Race            Race?       @relation(fields: [raceSeason, raceRound], references: [season, round])
 
   @@id([season, round, driverId])
   @@index([position])
@@ -146,17 +140,17 @@ model Result {
 model PitStop {
   season     Int
   round      Int
-  driver     Driver   @relation(fields: [driverId], references: [id])
-  driverId   String
   stop       Int
   lap        Int
   duration   Float
-  createdAt  DateTime @default(now()) @db.Timestamptz()
-  Circuit    Circuit? @relation(fields: [circuitId], references: [id])
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
   circuitId  String?
-  Race       Race?    @relation(fields: [raceSeason, raceRound], references: [season, round])
-  raceSeason Int?
+  driverId   String
   raceRound  Int?
+  raceSeason Int?
+  Circuit    Circuit? @relation(fields: [circuitId], references: [id])
+  driver     Driver   @relation(fields: [driverId], references: [id])
+  Race       Race?    @relation(fields: [raceSeason, raceRound], references: [season, round])
 
   @@id([season, round, driverId, stop])
   @@index([driverId, season, round])
@@ -166,21 +160,21 @@ model PitStop {
 model QualifyingResult {
   season          Int
   round           Int
-  driver          Driver      @relation(fields: [driverId], references: [id])
-  driverId        String
-  constructor     Constructor @relation(fields: [constructorId, constructorYear], references: [id, year])
-  constructorId   String
-  constructorYear Int
   position        Int
   q1              String?
   q2              String?
   q3              String?
-  createdAt       DateTime    @default(now()) @db.Timestamptz()
-  Circuit         Circuit?    @relation(fields: [circuitId], references: [id])
+  createdAt       DateTime    @default(now()) @db.Timestamptz(6)
+  constructorYear Int
   circuitId       String?
-  Race            Race?       @relation(fields: [raceSeason, raceRound], references: [season, round])
-  raceSeason      Int?
+  driverId        String
+  constructorId   String
   raceRound       Int?
+  raceSeason      Int?
+  Circuit         Circuit?    @relation(fields: [circuitId], references: [id])
+  constructor     Constructor @relation(fields: [constructorId, constructorYear], references: [id, year])
+  driver          Driver      @relation(fields: [driverId], references: [id])
+  Race            Race?       @relation(fields: [raceSeason, raceRound], references: [season, round])
 
   @@id([season, round, driverId])
   @@index([position])
@@ -194,11 +188,11 @@ model DriverStanding {
   position  Int
   points    Float
   wins      Int
+  driverId  String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
   driver    Driver   @relation(fields: [driverId], references: [id])
-  driverId  String // changed from Int to String
   race      Race     @relation(fields: [season, round], references: [season, round])
-  createdAt DateTime @default(now()) @db.Timestamptz()
-  updatedAt DateTime @updatedAt @db.Timestamptz()
 
   @@id([season, round, driverId])
   @@index([position])
@@ -212,12 +206,12 @@ model ConstructorStanding {
   position        Int
   points          Float
   wins            Int
-  constructor     Constructor @relation(fields: [constructorId, constructorYear], references: [id, year])
   constructorId   String
+  createdAt       DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime    @updatedAt @db.Timestamptz(6)
   constructorYear Int
+  constructor     Constructor @relation(fields: [constructorId, constructorYear], references: [id, year])
   race            Race        @relation(fields: [season, round], references: [season, round])
-  createdAt       DateTime    @default(now()) @db.Timestamptz()
-  updatedAt       DateTime    @updatedAt @db.Timestamptz()
 
   @@id([season, round, constructorId, constructorYear])
   @@index([position])
