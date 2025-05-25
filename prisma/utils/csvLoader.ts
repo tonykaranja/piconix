@@ -73,7 +73,7 @@ async function processBatch<T, R>(
     batchSize: number,
     validateFn: (record: R) => void,
     transformFn: (record: R) => T,
-    createManyFn: (data: T[]) => Promise<Prisma.BatchPayload>
+    createManyFn: (data: T[]) => Promise<{ count: number }>
 ) {
     console.log(`Processing batch of ${records.length} records`)
     const batches: R[][] = []
