@@ -54,3 +54,11 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Data files
+data/f1/*.db
+data/f1/*.sqlite
+data/f1/*.sqlite3
+
+# Keep CSV files
+!data/f1/*.csv

@@ -26,3 +26,201 @@ model Logs {
   createdAt DateTime @default(now()) @db.Timestamptz()
   updatedAt DateTime @updatedAt @db.Timestamptz()
 }
+
+model QuestionAnswer {
+  id        String   @id @default(uuid())
+  question  String
+  answer    String
+  timestamp DateTime @default(now()) @db.Timestamptz()
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
+}
+
+model Circuit {
+  id                String             @id
+  url               String?
+  name              String             @map("circuitName")
+  locality          String?
+  country           String?
+  latitude          Float?
+  longitude         Float?
+  races             Race[]
+  results           Result[]
+  pitStops          PitStop[]
+  qualifyingResults QualifyingResult[]
+  createdAt         DateTime           @default(now()) @db.Timestamptz()
+  updatedAt         DateTime           @updatedAt @db.Timestamptz()
+
+  @@index([name])
+  @@index([country])
+}
+
+model Constructor {
+  id          String // changed from Int to String
+  year        Int
+  url         String?
+  name        String                @map("Name")
+  nationality String?
+  results     Result[]
+  qualifying  QualifyingResult[]
+  standings   ConstructorStanding[]
+  createdAt   DateTime              @default(now()) @db.Timestamptz()
+  updatedAt   DateTime              @updatedAt @db.Timestamptz()
+
+  @@id([id, year])
+  @@index([name])
+  @@index([nationality])
+  @@index([year])
+}
+
+model Driver {
+  id          String             @id // changed from Int to String and made primary key
+  url         String?
+  givenName   String
+  familyName  String
+  dateOfBirth DateTime
+  nationality String?
+  results     Result[]
+  qualifying  QualifyingResult[]
+  pitStops    PitStop[]
+  standings   DriverStanding[]
+  createdAt   DateTime           @default(now()) @db.Timestamptz()
+  updatedAt   DateTime           @updatedAt @db.Timestamptz()
+
+  @@index([givenName, familyName])
+  @@index([nationality])
+  @@index([dateOfBirth])
+}
+
+model Race {
+  season               Int
+  round                Int
+  circuit              Circuit               @relation(fields: [circuitId], references: [id])
+  circuitId            String
+  raceDate             DateTime?
+  results              Result[]
+  qualifying           QualifyingResult[]
+  pitStops             PitStop[]
+  driverStandings      DriverStanding[]
+  constructorStandings ConstructorStanding[]
+  createdAt            DateTime              @default(now()) @db.Timestamptz()
+  updatedAt            DateTime              @updatedAt @db.Timestamptz()
+
+  @@id([season, round])
+  @@index([circuitId])
+  @@index([raceDate])
+}
+
+model Result {
+  season          Int
+  round           Int
+  driver          Driver      @relation(fields: [driverId], references: [id])
+  driverId        String
+  constructor     Constructor @relation(fields: [constructorId, constructorYear], references: [id, year])
+  constructorId   String
+  constructorYear Int
+  position        Int
+  points          Float
+  grid            Int
+  laps            Int
+  status          String?
+  time            String?
+  fastestLapTime  String?
+  fastestLapLap   Int?
+  averageSpeed    Float?
+  createdAt       DateTime    @default(now()) @db.Timestamptz()
+  updatedAt       DateTime    @updatedAt @db.Timestamptz()
+  Circuit         Circuit?    @relation(fields: [circuitId], references: [id])
+  circuitId       String?
+  Race            Race?       @relation(fields: [raceSeason, raceRound], references: [season, round])
+  raceSeason      Int?
+  raceRound       Int?
+
+  @@id([season, round, driverId])
+  @@index([position])
+  @@index([points])
+  @@index([driverId, season, round])
+  @@index([constructorId, constructorYear, season, round])
+}
+
+model PitStop {
+  season     Int
+  round      Int
+  driver     Driver   @relation(fields: [driverId], references: [id])
+  driverId   String
+  stop       Int
+  lap        Int
+  duration   Float
+  createdAt  DateTime @default(now()) @db.Timestamptz()
+  Circuit    Circuit? @relation(fields: [circuitId], references: [id])
+  circuitId  String?
+  Race       Race?    @relation(fields: [raceSeason, raceRound], references: [season, round])
+  raceSeason Int?
+  raceRound  Int?
+
+  @@id([season, round, driverId, stop])
+  @@index([driverId, season, round])
+  @@index([lap])
+}
+
+model QualifyingResult {
+  season          Int
+  round           Int
+  driver          Driver      @relation(fields: [driverId], references: [id])
+  driverId        String
+  constructor     Constructor @relation(fields: [constructorId, constructorYear], references: [id, year])
+  constructorId   String
+  constructorYear Int
+  position        Int
+  q1              String?
+  q2              String?
+  q3              String?
+  createdAt       DateTime    @default(now()) @db.Timestamptz()
+  Circuit         Circuit?    @relation(fields: [circuitId], references: [id])
+  circuitId       String?
+  Race            Race?       @relation(fields: [raceSeason, raceRound], references: [season, round])
+  raceSeason      Int?
+  raceRound       Int?
+
+  @@id([season, round, driverId])
+  @@index([position])
+  @@index([driverId, season, round])
+  @@index([constructorId, constructorYear, season, round])
+}
+
+model DriverStanding {
+  season    Int
+  round     Int
+  position  Int
+  points    Float
+  wins      Int
+  driver    Driver   @relation(fields: [driverId], references: [id])
+  driverId  String // changed from Int to String
+  race      Race     @relation(fields: [season, round], references: [season, round])
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @updatedAt @db.Timestamptz()
+
+  @@id([season, round, driverId])
+  @@index([position])
+  @@index([points])
+  @@index([driverId, season, round])
+}
+
+model ConstructorStanding {
+  season          Int
+  round           Int
+  position        Int
+  points          Float
+  wins            Int
+  constructor     Constructor @relation(fields: [constructorId, constructorYear], references: [id, year])
+  constructorId   String
+  constructorYear Int
+  race            Race        @relation(fields: [season, round], references: [season, round])
+  createdAt       DateTime    @default(now()) @db.Timestamptz()
+  updatedAt       DateTime    @updatedAt @db.Timestamptz()
+
+  @@id([season, round, constructorId, constructorYear])
+  @@index([position])
+  @@index([points])
+  @@index([constructorId, constructorYear, season, round])
+}
