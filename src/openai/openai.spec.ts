@@ -7,22 +7,33 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const testQuestions = [
     "What position did Michael Schumacher finish in round 1 in 2000?",
-    // "Who finished in position 1 in round 1 of 2000?",
-    // "Who constructed the car that finished in position 1 in round 1 of 2000?",
-    // "What constructor did Michael Schumacher drive for in round 1 in 2000?",
-    // "What is the nationality of the constructor that finished in position 1 in round 1 of 2000?"
+    "Who finished in position 1 in round 1 of 2000?",
+    "Who constructed the car that finished in position 1 in round 1 of 2000?",
+    "What constructor did Michael Schumacher drive for in round 1 in 2000?",
+    "What is the nationality of the constructor that finished in position 1 in round 1 of 2000?"
 ];
 
 async function runTests() {
+    console.log("🧪 Starting F1 Bot Tests...\n");
+
     for (const question of testQuestions) {
         console.log(`\n🧠 Question: ${question}`);
         try {
             const result = await chatWithF1Bot({ userQuestion: question, openai: openai });
-            console.log(`✅ Answer:`, result);
+            console.log(`✅ Answer: ${result}`);
         } catch (err) {
             console.error(`❌ Error answering "${question}":`, err);
+            if (err instanceof Error) {
+                console.error(`Error details: ${err.message}`);
+                console.error(`Stack trace: ${err.stack}`);
+            }
         }
     }
+
+    console.log("\n✨ Tests completed!");
 }
 
-runTests();
+runTests().catch(err => {
+    console.error("Fatal error running tests:", err);
+    process.exit(1);
+});

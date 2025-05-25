@@ -52,14 +52,21 @@ export async function get_driver_position({ driverName, season, round }: {
     const [givenName, ...familyParts] = driverName.trim().split(" ");
     const familyName = familyParts.join(" ");
     console.log(`[DEBUG] Searching for driver: givenName='${givenName}', familyName='${familyName}'`);
+
     const driver = await prisma.driver.findFirst({
         where: {
-            givenName: { equals: givenName, mode: "insensitive" },
-            familyName: { equals: familyName, mode: "insensitive" },
+            AND: [
+                { givenName: { equals: givenName, mode: "insensitive" } },
+                { familyName: { equals: familyName, mode: "insensitive" } }
+            ]
+
         }
     });
     console.log(`[DEBUG] Found driver:`, driver);
-    if (!driver) return { position: null, driverName: null, driverId: null, constructorName: null, constructorId: null };
+
+    if (!driver) {
+        throw new Error(`Driver not found: ${driverName}`);
+    }
 
     const result = await prisma.result.findFirst({
         where: { driverId: driver.id, season, round },
@@ -67,10 +74,14 @@ export async function get_driver_position({ driverName, season, round }: {
     });
     console.log(`[DEBUG] Result for driverId='${driver.id}', season=${season}, round=${round}:`, result);
 
+    if (!result) {
+        throw new Error(`No result found for ${driverName} in season ${season}, round ${round}`);
+    }
+
     return {
-        position: result?.position ?? null,
-        constructorName: result?.constructor.name ?? null,
-        constructorId: result?.constructor.id ?? null
+        position: result.position,
+        constructorName: result.constructor.name,
+        constructorId: result.constructor.id
     };
 }
 
@@ -86,7 +97,10 @@ export async function get_driver_by_position({ position, season, round }: {
     });
     console.log(`[DEBUG] Found result:`, result);
 
-    if (!result || !result.driver) return { driverName: null, driverId: null, constructorName: null, constructorId: null };
+    if (!result || !result.driver) {
+        throw new Error(`No driver found in position ${position} for season ${season}, round ${round}`);
+    }
+
     return {
         driverName: `${result.driver.givenName} ${result.driver.familyName}`,
         driverId: result.driver.id,
@@ -107,7 +121,10 @@ export async function get_constructor_by_position({ position, season, round }: {
     });
     console.log(`[DEBUG] Found result:`, result);
 
-    if (!result || !result.constructor) return { constructorName: null, constructorId: null };
+    if (!result || !result.constructor) {
+        throw new Error(`No constructor found in position ${position} for season ${season}, round ${round}`);
+    }
+
     return {
         constructorName: result.constructor.name,
         constructorId: result.constructor.id
@@ -115,15 +132,20 @@ export async function get_constructor_by_position({ position, season, round }: {
 }
 
 export async function handleFunctionCall(name: string, args: any) {
-    switch (name) {
-        case "get_driver_position":
-            return await get_driver_position(args);
-        case "get_driver_by_position":
-            return await get_driver_by_position(args);
-        case "get_constructor_by_position":
-            return await get_constructor_by_position(args);
-        default:
-            throw new Error(`Unknown function: ${name}`);
+    try {
+        switch (name) {
+            case "get_driver_position":
+                return await get_driver_position(args);
+            case "get_driver_by_position":
+                return await get_driver_by_position(args);
+            case "get_constructor_by_position":
+                return await get_constructor_by_position(args);
+            default:
+                throw new Error(`Unknown function: ${name}`);
+        }
+    } catch (error) {
+        console.error(`[ERROR] Error in ${name}:`, error);
+        throw error;
     }
 }
 

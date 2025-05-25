@@ -157,10 +157,9 @@ export class AppService {
 
       // Convert answer to speech
       const mp3 = await this.openai.audio.speech.create({
-        instructions: `given question: ${question} and input answer object, summarize the answer in a concise way`,
         model: "gpt-4o-mini-tts",
         voice: "alloy",
-        input: JSON.stringify(answer),
+        input: answer.toString(),
       });
 
       const buffer = Buffer.from(await mp3.arrayBuffer());
