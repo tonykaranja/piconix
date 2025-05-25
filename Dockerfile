@@ -15,6 +15,9 @@ COPY . .
 
 # Build the NestJS application
 
+ARG DATABASE_URL
+
+
 
 RUN npm run build
 
