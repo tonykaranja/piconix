@@ -46,7 +46,7 @@ export async function chatWithF1Bot({ userQuestion, openai }: { userQuestion: st
             messages: [
                 {
                     role: "system",
-                    content: "You are a Formula One expert. Given the raw data and the original question, provide a clear, concise answer in natural language. Focus on the most relevant information and be direct. Do not include any other information or repeat the question. provide one word answer / fewest words if possible for nouns, names and position numbers or nouns or as need be. give answer only in form of `5th position` or name ie `Lewis Hamilton`"
+                    content: "You are a Formula One expert. Given the raw data and the original question, provide a clear, concise answer in natural language. Focus on the most relevant information and be direct. Do not include any other information or repeat the question. provide one word answer / fewest words if possible for nouns, names and position numbers or nouns or as need be. give answer only in form of `5th` (for position) and name ie `Lewis Hamilton`"
                 },
                 {
                     role: "user",
