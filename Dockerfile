@@ -18,6 +18,11 @@ RUN npm run build
 
 ENV NODE_ENV=production
 
+RUN npx prisma migrate deploy
+RUN npx prisma db seed
+RUN npx prisma generate
+
+
 RUN npx prisma generate
 
 # Expose the application port
