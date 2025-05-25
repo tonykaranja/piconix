@@ -15,11 +15,6 @@ COPY . .
 
 # Build the NestJS application
 
-ARG NODE_ENV=production
-ENV NODE_ENV=${NODE_ENV}
-
-ARG DATABASE_URL
-
 
 RUN npm run build
 
