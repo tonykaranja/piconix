@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { LlamaService } from './llama/llama';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggingInterceptor } from './middleware/logging.interceptor';
 import { AllExceptionsFilter } from './middleware/http-exception.filter';
@@ -11,10 +13,15 @@ import { PiconixLogTransport } from './middleware/piconix.logger';
 import { HttpAdapterHost } from '@nestjs/core';
 
 @Module({
-  imports: [],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+  ],
   controllers: [AppController],
   providers: [
     AppService,
+    LlamaService,
     {
       provide: 'WINSTON_LOGGER',
       useFactory: () => {

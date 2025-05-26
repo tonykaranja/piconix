@@ -7,13 +7,13 @@ const prisma = new PrismaClient()
 
 // Constants
 const DATA_DIR = join(process.cwd(), 'data', 'f1')
-console.log('Current working directory:', process.cwd())
-console.log('Data directory:', DATA_DIR)
+console.info('Current working directory:', process.cwd())
+console.info('Data directory:', DATA_DIR)
 
 // Helper function to check if file exists
 function checkFileExists(filePath: string): boolean {
     const exists = existsSync(filePath)
-    console.log(`Checking file ${filePath}: ${exists ? 'exists' : 'not found'}`)
+    console.info(`Checking file ${filePath}: ${exists ? 'exists' : 'not found'}`)
     return exists
 }
 
@@ -75,7 +75,7 @@ async function processBatch<T, R>(
     transformFn: (record: R) => T,
     createManyFn: (data: T[]) => Promise<{ count: number }>
 ) {
-    console.log(`Processing batch of ${records.length} records`)
+    console.info(`Processing batch of ${records.length} records`)
     const batches: R[][] = []
     for (let i = 0; i < records.length; i += batchSize) {
         const batch = records.slice(i, i + batchSize)
@@ -84,14 +84,14 @@ async function processBatch<T, R>(
 
     for (const [index, batch] of batches.entries()) {
         try {
-            console.log(`Processing batch ${index + 1}/${batches.length} (${batch.length} records)`)
+            console.info(`Processing batch ${index + 1}/${batches.length} (${batch.length} records)`)
             // Validate all records in batch
             batch.forEach(validateFn)
             // Transform records
             const transformedData = batch.map(transformFn)
             // Create records with skipDuplicates option
             const result = await createManyFn(transformedData)
-            console.log(`Created ${result.count} records in batch ${index + 1} (skipped duplicates)`)
+            console.info(`Created ${result.count} records in batch ${index + 1} (skipped duplicates)`)
         } catch (error) {
             console.error(`Error processing batch ${index + 1}:`, error)
             throw error
@@ -124,13 +124,13 @@ export async function loadCircuits(tx: Prisma.TransactionClient) {
         throw new Error(`Circuits CSV file not found at ${csvPath}`)
     }
 
-    console.log('Loading circuits from:', csvPath)
+    console.info('Loading circuits from:', csvPath)
     const fileContent = readFileSync(csvPath, 'utf-8')
     const records = parse(fileContent, {
         columns: true,
         skip_empty_lines: true
     })
-    console.log(`Found ${records.length} circuit records`)
+    console.info(`Found ${records.length} circuit records`)
 
     await processBatch(
         records,
@@ -349,8 +349,8 @@ export async function loadPitStops(tx: Prisma.TransactionClient) {
 
 // Main function to load all data in a transaction
 export async function loadAllData() {
-    console.log('Starting data import...')
-    console.log('Checking data directory...')
+    console.info('Starting data import...')
+    console.info('Checking data directory...')
 
     if (!existsSync(DATA_DIR)) {
         throw new Error(`Data directory not found at ${DATA_DIR}`)
@@ -358,33 +358,33 @@ export async function loadAllData() {
 
     try {
         await prisma.$transaction(async (tx) => {
-            console.log('Starting transaction...')
+            console.info('Starting transaction...')
 
-            console.log('Loading circuits...')
+            console.info('Loading circuits...')
             await loadCircuits(tx)
 
-            console.log('Loading constructors...')
+            console.info('Loading constructors...')
             await loadConstructors(tx)
 
-            console.log('Loading drivers...')
+            console.info('Loading drivers...')
             await loadDrivers(tx)
 
             // Skipping races loading due to missing races.csv
-            console.log('Skipping races loading (races.csv not found)...')
+            console.info('Skipping races loading (races.csv not found)...')
 
-            console.log('Loading results...')
+            console.info('Loading results...')
             await loadResults(tx)
 
-            console.log('Loading qualifying results...')
+            console.info('Loading qualifying results...')
             await loadQualifyingResults(tx)
 
-            console.log('Loading pit stops...')
+            console.info('Loading pit stops...')
             await loadPitStops(tx)
 
-            console.log('Transaction completed successfully')
+            console.info('Transaction completed successfully')
         })
 
-        console.log('Data import completed successfully!')
+        console.info('Data import completed successfully!')
     } catch (error) {
         console.error('Error during data import:', error)
         throw error

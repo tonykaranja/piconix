@@ -1,21 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from "openai";
 import { config } from 'dotenv';
-import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { Articles, BiasResponse, responseFormat } from './llama/biasDetector';
 import { chatWithF1Bot } from './openai/openai';
+import { LlamaService } from './llama/llama';
 
-const BiasDetection = z.object({
-  biasedArticle: z.object({
-    title: z.string(),
-    type: z.enum(['positive', 'negative']),
-    reason: z.string(),
-  }),
-});
 
 const Article = z.object({
   title: z.string(),
@@ -51,79 +44,23 @@ const env = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
 } as const;
 
-interface LlamaMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
 
-interface LlamaRequestConfig {
-  messages: LlamaMessage[];
-  model?: string;
-  temperature?: number;
-  top_p?: number;
-  max_completion_tokens?: number;
-  response_format?: any;
-  repetition_penalty?: number;
-  stream?: boolean;
-}
-
-class LlamaClient {
-  private readonly apiKey: string;
-  private readonly baseUrl: string;
-
-  constructor(apiKey: string, baseUrl: string = 'https://api.llama.com/v1') {
-    this.apiKey = apiKey;
-    this.baseUrl = baseUrl;
-  }
-
-  async chatCompletion(config: LlamaRequestConfig): Promise<Response> {
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`
-      },
-      body: JSON.stringify({
-        model: config.model || "Llama-4-Maverick-17B-128E-Instruct-FP8",
-        temperature: config.temperature ?? 0.6,
-        top_p: config.top_p ?? 0.9,
-        max_completion_tokens: config.max_completion_tokens ?? 2048,
-        repetition_penalty: config.repetition_penalty ?? 1,
-        stream: config.stream ?? false,
-        ...config
-      })
-    });
-
-    if (!response.ok) {
-      console.error('API request failed with status:', response.status);
-      throw new Error(`API call failed with status ${response.status}`);
-    }
-
-    return response;
-  }
-}
 
 @Injectable()
 export class AppService {
   private readonly openai: OpenAI;
   private readonly voiceCacheDir: string;
   private readonly prisma: PrismaClient;
-  private readonly llamaClient: LlamaClient;
 
-  constructor() {
+  constructor(
+    private readonly llamaService: LlamaService
+  ) {
     this.openai = new OpenAI({
       apiKey: env.OPENAI_API_KEY,
     });
     this.voiceCacheDir = path.join(process.cwd(), 'voice-cache');
     this.initializeCacheDirectory();
     this.prisma = new PrismaClient();
-
-    const LLAMA_API_KEY = process.env.LLAMA_API_KEY;
-    if (!LLAMA_API_KEY) {
-      throw new Error('LLAMA_API_KEY is not set in environment variables');
-    }
-    this.llamaClient = new LlamaClient(LLAMA_API_KEY);
   }
 
   private async initializeCacheDirectory() {
@@ -149,7 +86,7 @@ export class AppService {
       return await fs.readFile(filePath);
     } catch (error) {
       // File doesn't exist, generate new voice
-      console.log(`Generating new voice file for ${name}`);
+      console.info(`Generating new voice file for ${name}`);
       const buffer = await this.textToSpeech({ text: name, instructions: "say the input name" });
 
       // Save to cache
@@ -216,7 +153,11 @@ export class AppService {
       const question = await this.transcribeAudio(file);
 
       // Get answer from GPT-4
-      const answer = await chatWithF1Bot({ userQuestion: question, openai: this.openai });
+      const answer = await chatWithF1Bot({
+        userQuestion: question,
+        openai: this.openai,
+        llamaService: this.llamaService
+      });
 
       // Save question and answer to database
       await this.saveQuestionAnswer(question, JSON.stringify(answer) || 'No answer');
@@ -335,7 +276,7 @@ Return JSON:
   }
 
   private async callLlamaAPI(articles: Articles[]): Promise<Response> {
-    return this.llamaClient.chatCompletion({
+    return this.llamaService.chatCompletion({
       messages: [
         {
           role: "system",

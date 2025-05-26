@@ -1,7 +1,8 @@
 import OpenAI from "openai";
 import { functions, handleFunctionCall } from "./functions";
+import { LlamaService } from "../llama/llama";
 
-export async function chatWithF1Bot({ userQuestion, openai }: { userQuestion: string, openai: OpenAI }): Promise<string> {
+export async function chatWithF1Bot({ userQuestion, openai, llamaService }: { userQuestion: string, openai: OpenAI, llamaService: LlamaService }): Promise<string> {
     if (!userQuestion?.trim()) {
         throw new Error("Question cannot be empty");
     }
@@ -41,32 +42,38 @@ export async function chatWithF1Bot({ userQuestion, openai }: { userQuestion: st
 
         console.log(`[DEBUG] Raw Result:`, result);
 
-        const processedAnswer = await openai.chat.completions.create({
-            model: "gpt-4",
+        // Then, use Llama to process the answer
+        const llamaResponse = await llamaService.chatCompletion({
             messages: [
                 {
                     role: "system",
-                    content: "You are a Formula One expert. Given the raw data and the original question, provide a clear, concise answer in natural language. Focus on the most relevant information and be direct. Do not include any other information or repeat the question. provide one word answer / fewest words if possible for nouns, names and position numbers or nouns or as need be. give answer only in form of `5th` (for position) and name ie `Lewis Hamilton`"
+                    content: "You are a expert in extracting information from json data. Given the json with answer data and the original question, extract a clear, concise answer in natural language. Focus on the most relevant information and be direct. Do not include any other information or repeat the question. provide one word answer / fewest words if possible for nouns, names and position numbers or nouns or as need be. give answer only in form of `5th` (for position) and name ie `Lewis Hamilton`"
                 },
                 {
                     role: "user",
-                    content: `Question: ${userQuestion}\nRaw Data: ${JSON.stringify(result)}\nPlease provide a simple, clear, concise answer based on this data. use one-word answer / fewest words if possible for names and position numbers or nouns or as need be.`
+                    content: `Question: ${userQuestion}\nRaw json answer data: ${JSON.stringify(result)}\nPlease extract a simple, clear, concise answer for the question based on the answer data. use one-word answer / fewest words if possible for names and position numbers or nouns or as need be.`
                 }
-            ]
+            ],
+            temperature: 0.2
         });
 
-        if (!processedAnswer.choices?.[0]?.message?.content) {
-            throw new Error("No content in processed answer");
+        const llamaData = await llamaResponse.json();
+        console.info(`[DEBUG] Llama Data:`, llamaData);
+        if (!llamaData.completion_message?.content?.text) {
+            throw new Error("No content in Llama response");
         }
 
-        const answer = processedAnswer.choices[0].message.content;
-        console.log(`[DEBUG] Processed Answer:`, answer);
+        const answer: string = llamaData.completion_message.content.text;
+        console.info(`[DEBUG] Processed Answer:`, answer);
 
         if (!answer.trim()) {
             throw new Error("Empty answer generated");
         }
 
+        console.info(`[DEBUG] Answer:`, answer);
+
         return answer;
+
     } catch (error) {
         console.error("[ERROR] Error in chatWithF1Bot:", error);
         throw error instanceof Error
