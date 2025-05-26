@@ -90,14 +90,7 @@ export class AppService {
     } catch (error) {
       // File doesn't exist, generate new voice
       console.log(`Generating new voice file for ${name}`);
-      const mp3 = await this.openai.audio.speech.create({
-        model: "gpt-4o-mini-tts",
-        voice: "alloy",
-        input: name,
-        instructions: "say the input name",
-      });
-
-      const buffer = Buffer.from(await mp3.arrayBuffer());
+      const buffer = await this.textToSpeech({ text: name, instructions: "say the input name" });
 
       // Save to cache
       await fs.writeFile(filePath, buffer);
@@ -106,15 +99,50 @@ export class AppService {
     }
   }
 
+  private async transcribeAudio(file: File): Promise<string> {
+    const transcription = await this.openai.audio.transcriptions.create({
+      file,
+      model: "whisper-1",
+    });
+
+    if (!transcription.text) {
+      throw new Error('Failed to transcribe audio');
+    }
+
+    return transcription.text;
+  }
+
+  private async saveQuestionAnswer(question: string, answer: string): Promise<void> {
+    const questionAndAnswer = {
+      question,
+      answer,
+      timestamp: new Date()
+    };
+
+    try {
+      await this.prisma.questionAnswer.create({
+        data: questionAndAnswer
+      });
+    } catch (dbError) {
+      console.error('Failed to save Q&A to database:', dbError);
+    }
+  }
+
+  private async textToSpeech({ text, instructions }: { text: string, instructions?: string }): Promise<Buffer> {
+    const mp3 = await this.openai.audio.speech.create({
+      model: "gpt-4o-mini-tts",
+      voice: "alloy",
+      input: text,
+      ...(instructions && { instructions }),
+    });
+
+    return Buffer.from(await mp3.arrayBuffer());
+  }
+
   async handleAudioQuestion(audioFile: Express.Multer.File): Promise<Buffer> {
     try {
-      if (!audioFile) {
-        throw new Error('No audio file provided');
-      }
-
-      // Ensure we have a valid buffer
       if (!audioFile.buffer) {
-        throw new Error('Audio file buffer is empty');
+        throw new Error('No audio file provided');
       }
 
       // Create a File object from the buffer
@@ -125,44 +153,16 @@ export class AppService {
       );
 
       // Convert audio file to text using OpenAI's Whisper
-      const transcription = await this.openai.audio.transcriptions.create({
-        file,
-        model: "whisper-1",
-      });
-
-      if (!transcription.text) {
-        throw new Error('Failed to transcribe audio');
-      }
-
-      const question = transcription.text;
+      const question = await this.transcribeAudio(file);
 
       // Get answer from GPT-4
       const answer = await chatWithF1Bot({ userQuestion: question, openai: this.openai });
 
       // Save question and answer to database
-      const questionAndAnswer = {
-        question: question,
-        answer: JSON.stringify(answer) || 'No answer',
-        timestamp: new Date()
-      };
-      console.info('questionAndAnswer', questionAndAnswer);
-      try {
-        await this.prisma.questionAnswer.create({
-          data: questionAndAnswer
-        });
-      } catch (dbError) {
-        console.error('Failed to save Q&A to database:', dbError);
-        // Continue execution even if DB save fails
-      }
+      await this.saveQuestionAnswer(question, JSON.stringify(answer) || 'No answer');
 
       // Convert answer to speech
-      const mp3 = await this.openai.audio.speech.create({
-        model: "gpt-4o-mini-tts",
-        voice: "alloy",
-        input: answer.toString(),
-      });
-
-      const buffer = Buffer.from(await mp3.arrayBuffer());
+      const buffer = await this.textToSpeech({ text: answer.toString() });
       await fs.writeFile(`${this.voiceCacheDir}/${question}.mp3`, buffer);
       return buffer;
     } catch (error) {
@@ -376,9 +376,7 @@ Return JSON:
     }
   }
 
-  async detectBiasLlama(articles: Articles[]): Promise<BiasResponse> {
-    console.info('Starting bias detection for', articles.length, 'articles');
-
+  private async callLlamaAPI(articles: Articles[]): Promise<Response> {
     const LLAMA_API_KEY = process.env.LLAMA_API_KEY;
 
     if (!LLAMA_API_KEY) {
@@ -420,40 +418,55 @@ Return JSON:
       throw new Error(`API call failed with status ${response.status}`);
     }
 
+    return response;
+  }
+
+  private validateLlamaResponse(data: any): string {
+    if (!data.completion_message?.content?.text) {
+      console.error('Invalid response format:', data);
+      throw new Error('Invalid response format from Llama API');
+    }
+
+    const content = data.completion_message.content.text;
+    console.info('Response content:', content);
+    return content;
+  }
+
+  private parseBiasResponse(content: string): BiasResponse {
     try {
+      // Parse the content as JSON and validate the structure
+      const parsedContent = JSON.parse(content);
+      if (!parsedContent.biasedArticle) {
+        throw new Error('Invalid response structure: missing biasedArticle');
+      }
+
+      // Validate the required fields
+      const { title, type, reason } = parsedContent.biasedArticle;
+      if (!title || !type || !reason) {
+        throw new Error('Invalid response structure: missing required fields');
+      }
+
+      // Clean up the title by removing extra quotes
+      parsedContent.biasedArticle.title = title.replace(/^"|"$/g, '');
+
+      console.info('Successfully parsed and validated response');
+      return parsedContent as BiasResponse;
+    } catch (e) {
+      console.error('Failed to parse response content:', e);
+      throw new Error('Invalid response format');
+    }
+  }
+
+  async detectBiasLlama(articles: Articles[]): Promise<BiasResponse> {
+    console.info('Starting bias detection for', articles.length, 'articles');
+
+    try {
+      const response = await this.callLlamaAPI(articles);
       const data = await response.json();
       console.info('Received response:', JSON.stringify(data, null, 2));
 
-      if (!data.completion_message?.content?.text) {
-        console.error('Invalid response format:', data);
-        throw new Error('Invalid response format from Llama API');
-      }
-
-      const content = data.completion_message.content.text;
-      console.info('Response content:', content);
-
-      try {
-        // Parse the content as JSON and validate the structure
-        const parsedContent = JSON.parse(content);
-        if (!parsedContent.biasedArticle) {
-          throw new Error('Invalid response structure: missing biasedArticle');
-        }
-
-        // Validate the required fields
-        const { title, type, reason } = parsedContent.biasedArticle;
-        if (!title || !type || !reason) {
-          throw new Error('Invalid response structure: missing required fields');
-        }
-
-        // Clean up the title by removing extra quotes
-        parsedContent.biasedArticle.title = title.replace(/^"|"$/g, '');
-
-        console.info('Successfully parsed and validated response');
-        return parsedContent as BiasResponse;
-      } catch (e) {
-        console.error('Failed to parse response content:', e);
-        throw new Error('Invalid response format');
-      }
+      const content = this.validateLlamaResponse(data);
+      return this.parseBiasResponse(content);
     } catch (error) {
       console.error('Error processing response:', error);
       throw error;
