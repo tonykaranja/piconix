@@ -51,11 +51,65 @@ const env = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
 } as const;
 
+interface LlamaMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+interface LlamaRequestConfig {
+  messages: LlamaMessage[];
+  model?: string;
+  temperature?: number;
+  top_p?: number;
+  max_completion_tokens?: number;
+  response_format?: any;
+  repetition_penalty?: number;
+  stream?: boolean;
+}
+
+class LlamaClient {
+  private readonly apiKey: string;
+  private readonly baseUrl: string;
+
+  constructor(apiKey: string, baseUrl: string = 'https://api.llama.com/v1') {
+    this.apiKey = apiKey;
+    this.baseUrl = baseUrl;
+  }
+
+  async chatCompletion(config: LlamaRequestConfig): Promise<Response> {
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`
+      },
+      body: JSON.stringify({
+        model: config.model || "Llama-4-Maverick-17B-128E-Instruct-FP8",
+        temperature: config.temperature ?? 0.6,
+        top_p: config.top_p ?? 0.9,
+        max_completion_tokens: config.max_completion_tokens ?? 2048,
+        repetition_penalty: config.repetition_penalty ?? 1,
+        stream: config.stream ?? false,
+        ...config
+      })
+    });
+
+    if (!response.ok) {
+      console.error('API request failed with status:', response.status);
+      throw new Error(`API call failed with status ${response.status}`);
+    }
+
+    return response;
+  }
+}
+
 @Injectable()
 export class AppService {
   private readonly openai: OpenAI;
   private readonly voiceCacheDir: string;
   private readonly prisma: PrismaClient;
+  private readonly llamaClient: LlamaClient;
 
   constructor() {
     this.openai = new OpenAI({
@@ -64,6 +118,12 @@ export class AppService {
     this.voiceCacheDir = path.join(process.cwd(), 'voice-cache');
     this.initializeCacheDirectory();
     this.prisma = new PrismaClient();
+
+    const LLAMA_API_KEY = process.env.LLAMA_API_KEY;
+    if (!LLAMA_API_KEY) {
+      throw new Error('LLAMA_API_KEY is not set in environment variables');
+    }
+    this.llamaClient = new LlamaClient(LLAMA_API_KEY);
   }
 
   private async initializeCacheDirectory() {
@@ -171,108 +231,6 @@ export class AppService {
     }
   }
 
-  //   async detectBias(body: any) {
-  //     // Validate input is an array of articles
-  //     const articles = ArticleArray.parse(body);
-
-  //     // Filter out invalid articles (empty content or title)
-  //     const validArticles = articles.filter(article =>
-  //       article.title &&
-  //       article.content &&
-  //       article.title.trim() !== '' &&
-  //       article.content.trim() !== ''
-  //     );
-
-  //     if (validArticles.length === 0) {
-  //       throw new Error('No valid articles to analyze');
-  //     }
-
-  //     console.info('Analyzing', validArticles.length, 'articles');
-
-  //     // Step 1: Analyze all articles together for comparative bias
-  //     const analysis = await this.openai.chat.completions.create({
-  //       model: "gpt-4",
-  //       messages: [
-  //         {
-  //           role: "system",
-  //           content: `You are a bias detection expert. Analyze these articles and determine which one shows the most bias.
-
-  // For each article, provide:
-  // - A bias score (0-100)
-  // - The type of bias (MUST be either "positive" or "negative"); re-evaluate none answer and use closest positive | negative match
-  // - A single, concise reason for the bias
-
-  // Then select the most biased article based on your analysis.
-
-  // Return JSON:
-  // {
-  //   "articles": [
-  //     {
-  //       "index": 0,
-  //       "biasScore": 0-100,
-  //       "biasType": "positive/negative",
-  //       "reason": "single concise reason"
-  //     }
-  //   ],
-  //   "mostBiased": {
-  //     "index": 0,
-  //     "type": "positive/negative",
-  //     "reason": "single concise reason"
-  //   }
-  // }`
-  //         },
-  //         {
-  //           role: "user",
-  //           content: validArticles.map((article, index) =>
-  //             `Article ${index + 1}:\nTitle: ${article.title}\nContent: ${article.content.substring(0, 500)}${article.content.length > 500 ? '...' : ''}`
-  //           ).join('\n\n')
-  //         }
-  //       ]
-  //     });
-
-  //     const content = analysis.choices[0].message.content;
-  //     if (!content) {
-  //       throw new Error('Failed to get analysis content');
-  //     }
-
-  //     try {
-  //       const cleanedContent = content.trim().replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-  //       if (!cleanedContent) {
-  //         throw new Error('No valid JSON content found in response');
-  //       }
-
-  //       const parsed = JSON.parse(cleanedContent);
-
-  //       // Validate the response structure and bias types
-  //       const validatedResponse = AnalysisResponse.parse(parsed);
-
-  //       // Validate the selected index
-  //       const selectedIndex = validatedResponse.mostBiased.index;
-  //       if (selectedIndex < 0 || selectedIndex >= validArticles.length) {
-  //         throw new Error(`Invalid article index: ${selectedIndex}`);
-  //       }
-
-  //       const selectedArticle = validArticles[selectedIndex];
-
-  //       // Log the full analysis for debugging
-  //       console.info('Full analysis:', JSON.stringify(validatedResponse, null, 2));
-
-  //       const response = {
-  //         biasedArticle: {
-  //           title: selectedArticle.title,
-  //           type: validatedResponse.mostBiased.type,
-  //           reason: validatedResponse.mostBiased.reason
-  //         }
-  //       };
-
-  //       console.info('Final response:', response);
-  //       return response;
-  //     } catch (error) {
-  //       console.error('Error parsing analysis:', error);
-  //       console.error('Raw content:', content);
-  //       throw new Error('Failed to analyze articles: ' + error.message);
-  //     }
-  //   }
   async detectBias2(body: any) {
     // Validate input is an array of articles
     const articles = ArticleArray.parse(body);
@@ -377,48 +335,19 @@ Return JSON:
   }
 
   private async callLlamaAPI(articles: Articles[]): Promise<Response> {
-    const LLAMA_API_KEY = process.env.LLAMA_API_KEY;
-
-    if (!LLAMA_API_KEY) {
-      console.error('LLAMA_API_KEY is not set in environment variables');
-      throw new Error('LLAMA_API_KEY is not set in environment variables');
-    }
-
-    console.info('Making API request to Llama...');
-    const response = await fetch('https://api.llama.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${LLAMA_API_KEY}`
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: "system",
-            content: "you are responsible for analyzing information and detecting bias.\nGiven an array of objects with``` {title: string; content: string}```, analyze the content and output the object with the most bias"
-          },
-          {
-            role: "user",
-            content: `find the biased article\n\`\`\`\n${JSON.stringify(articles)}\n\`\`\``
-          }
-        ],
-        model: "Llama-4-Maverick-17B-128E-Instruct-FP8",
-        repetition_penalty: 1,
-        temperature: 0.6,
-        top_p: 0.9,
-        max_completion_tokens: 2048,
-        response_format: responseFormat,
-        stream: false
-      })
+    return this.llamaClient.chatCompletion({
+      messages: [
+        {
+          role: "system",
+          content: "you are responsible for analyzing information and detecting bias.\nGiven an array of objects with``` {title: string; content: string}```, analyze the content and output the object with the most bias"
+        },
+        {
+          role: "user",
+          content: `find the biased article\n\`\`\`\n${JSON.stringify(articles)}\n\`\`\``
+        }
+      ],
+      response_format: responseFormat
     });
-
-    if (!response.ok) {
-      console.error('API request failed with status:', response.status);
-      throw new Error(`API call failed with status ${response.status}`);
-    }
-
-    return response;
   }
 
   private validateLlamaResponse(data: any): string {
