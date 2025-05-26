@@ -89,9 +89,9 @@ async function processBatch<T, R>(
             batch.forEach(validateFn)
             // Transform records
             const transformedData = batch.map(transformFn)
-            // Create records
+            // Create records with skipDuplicates option
             const result = await createManyFn(transformedData)
-            console.log(`Created ${result.count} records in batch ${index + 1}`)
+            console.log(`Created ${result.count} records in batch ${index + 1} (skipped duplicates)`)
         } catch (error) {
             console.error(`Error processing batch ${index + 1}:`, error)
             throw error
@@ -145,7 +145,7 @@ export async function loadCircuits(tx: Prisma.TransactionClient) {
             longitude: record.longitude ? parseFloat(record.longitude) : null,
             url: record.url || null
         }),
-        (data) => tx.circuit.createMany({ data })
+        (data) => tx.circuit.createMany({ data, skipDuplicates: true })
     )
 }
 
@@ -168,7 +168,7 @@ export async function loadConstructors(tx: Prisma.TransactionClient) {
             nationality: record.Nationality || null,
             url: record.url || null
         }),
-        (data) => tx.constructor.createMany({ data })
+        (data) => tx.constructor.createMany({ data, skipDuplicates: true })
     )
 }
 
@@ -192,7 +192,7 @@ export async function loadDrivers(tx: Prisma.TransactionClient) {
             nationality: record.Nationality || null,
             url: record.url || null
         }),
-        (data) => tx.driver.createMany({ data })
+        (data) => tx.driver.createMany({ data, skipDuplicates: true })
     )
 }
 
@@ -226,7 +226,7 @@ export async function loadRaces(tx: Prisma.TransactionClient) {
             circuitId: record.circuitId,
             raceDate: record.date ? new Date(record.date) : null
         }),
-        (data) => tx.race.createMany({ data })
+        (data) => tx.race.createMany({ data, skipDuplicates: true })
     )
 }
 
@@ -275,7 +275,7 @@ export async function loadResults(tx: Prisma.TransactionClient) {
                 averageSpeed: record.AverageSpeed ? parseFloat(record.AverageSpeed) : null
             }
         },
-        (data) => tx.result.createMany({ data })
+        (data) => tx.result.createMany({ data, skipDuplicates: true })
     )
 }
 
@@ -319,7 +319,7 @@ export async function loadQualifyingResults(tx: Prisma.TransactionClient) {
                 q3: record.Q3 || null
             }
         },
-        (data) => tx.qualifyingResult.createMany({ data })
+        (data) => tx.qualifyingResult.createMany({ data, skipDuplicates: true })
     )
 }
 
@@ -343,7 +343,7 @@ export async function loadPitStops(tx: Prisma.TransactionClient) {
             lap: parseInt(record.lap),
             duration: parseFloat(record.duration)
         }),
-        (data) => tx.pitStop.createMany({ data })
+        (data) => tx.pitStop.createMany({ data, skipDuplicates: true })
     )
 }
 
