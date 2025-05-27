@@ -1,41 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from "openai";
 import { config } from 'dotenv';
-import { z } from "zod";
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { Articles, BiasResponse, responseFormat } from './llama/biasDetector.types';
 import { chatWithF1Bot } from './openai/openai';
 import { LlamaService } from './llama/llama';
-
-
-const Article = z.object({
-  title: z.string(),
-  content: z.string(),
-});
-
-const ArticleArray = z.array(Article);
-
-const BiasType = z.enum(['positive', 'negative', 'none']).transform(val =>
-  val === 'none' ? 'negative' : val
-);
-
-const ArticleAnalysis = z.object({
-  index: z.number(),
-  biasScore: z.number().min(0).max(100),
-  biasType: BiasType,
-  reason: z.string().min(1)
-});
-
-const AnalysisResponse = z.object({
-  articles: z.array(ArticleAnalysis),
-  mostBiased: z.object({
-    index: z.number(),
-    type: BiasType,
-    reason: z.string().min(1)
-  })
-});
+import { parseBiasResponse } from './util';
 
 config({ path: '.env' });
 
@@ -43,8 +15,6 @@ config({ path: '.env' });
 const env = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
 } as const;
-
-
 
 @Injectable()
 export class AppService {
@@ -172,108 +142,108 @@ export class AppService {
     }
   }
 
-  async detectBias2(body: any) {
-    // Validate input is an array of articles
-    const articles = ArticleArray.parse(body);
+  //   async detectBiasOpenAI(body: any) {
+  //     // Validate input is an array of articles
+  //     const articles = ArticleArray.parse(body);
 
-    // Filter out invalid articles (empty content or title)
-    const validArticles = articles.filter(article =>
-      article.title &&
-      article.content &&
-      article.title.trim() !== '' &&
-      article.content.trim() !== ''
-    );
+  //     // Filter out invalid articles (empty content or title)
+  //     const validArticles = articles.filter(article =>
+  //       article.title &&
+  //       article.content &&
+  //       article.title.trim() !== '' &&
+  //       article.content.trim() !== ''
+  //     );
 
-    if (validArticles.length === 0) {
-      throw new Error('No valid articles to analyze');
-    }
+  //     if (validArticles.length === 0) {
+  //       throw new Error('No valid articles to analyze');
+  //     }
 
-    console.info('Analyzing', validArticles.length, 'articles');
+  //     console.info('Analyzing', validArticles.length, 'articles');
 
-    // Step 1: Analyze all articles together for comparative bias
-    const analysis = await this.openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: `You are a bias detection expert. Analyze these articles and determine which one shows the most bias.
+  //     // Step 1: Analyze all articles together for comparative bias
+  //     const analysis = await this.openai.chat.completions.create({
+  //       model: "gpt-4",
+  //       messages: [
+  //         {
+  //           role: "system",
+  //           content: `You are a bias detection expert. Analyze these articles and determine which one shows the most bias.
 
-For each article, provide:
-- A bias score (0-100)
-- The type of bias (MUST be either "positive" or "negative"); re-evaluate none answer and use closest positive | negative match
-- A single, concise reason for the bias
+  // For each article, provide:
+  // - A bias score (0-100)
+  // - The type of bias (MUST be either "positive" or "negative"); re-evaluate none answer and use closest positive | negative match
+  // - A single, concise reason for the bias
 
-Then select the most biased article based on your analysis.
+  // Then select the most biased article based on your analysis.
 
-Return JSON:
-{
-"articles": [
-{
-"index": 0,
-"biasScore": 0-100,
-"biasType": "positive/negative",
-"reason": "single concise reason"
-}
-],
-"mostBiased": {
-"index": 0,
-"type": "positive/negative",
-"reason": "single concise reason"
-}
-}`
-        },
-        {
-          role: "user",
-          content: validArticles.map((article, index) =>
-            `Article ${index + 1}:\nTitle: ${article.title}\nContent: ${article.content.substring(0, 500)}${article.content.length > 500 ? '...' : ''}`
-          ).join('\n\n')
-        }
-      ]
-    });
+  // Return JSON:
+  // {
+  // "articles": [
+  // {
+  // "index": 0,
+  // "biasScore": 0-100,
+  // "biasType": "positive/negative",
+  // "reason": "single concise reason"
+  // }
+  // ],
+  // "mostBiased": {
+  // "index": 0,
+  // "type": "positive/negative",
+  // "reason": "single concise reason"
+  // }
+  // }`
+  //         },
+  //         {
+  //           role: "user",
+  //           content: validArticles.map((article, index) =>
+  //             `Article ${index + 1}:\nTitle: ${article.title}\nContent: ${article.content.substring(0, 500)}${article.content.length > 500 ? '...' : ''}`
+  //           ).join('\n\n')
+  //         }
+  //       ]
+  //     });
 
-    const content = analysis.choices[0].message.content;
-    if (!content) {
-      throw new Error('Failed to get analysis content');
-    }
+  //     const content = analysis.choices[0].message.content;
+  //     if (!content) {
+  //       throw new Error('Failed to get analysis content');
+  //     }
 
-    try {
-      const cleanedContent = content.trim().replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-      if (!cleanedContent) {
-        throw new Error('No valid JSON content found in response');
-      }
+  //     try {
+  //       const cleanedContent = content.trim().replace(/^[^{]*/, '').replace(/[^}]*$/, '');
+  //       if (!cleanedContent) {
+  //         throw new Error('No valid JSON content found in response');
+  //       }
 
-      const parsed = JSON.parse(cleanedContent);
+  //       const parsed = JSON.parse(cleanedContent);
 
-      // Validate the response structure and bias types
-      const validatedResponse = AnalysisResponse.parse(parsed);
+  //       // Validate the response structure and bias types
+  //       const validatedResponse = AnalysisResponse.parse(parsed);
 
-      // Validate the selected index
-      const selectedIndex = validatedResponse.mostBiased.index;
-      if (selectedIndex < 0 || selectedIndex >= validArticles.length) {
-        throw new Error(`Invalid article index: ${selectedIndex}`);
-      }
+  //       // Validate the selected index
+  //       const selectedIndex = validatedResponse.mostBiased.index;
+  //       if (selectedIndex < 0 || selectedIndex >= validArticles.length) {
+  //         throw new Error(`Invalid article index: ${selectedIndex}`);
+  //       }
 
-      const selectedArticle = validArticles[selectedIndex];
+  //       const selectedArticle = validArticles[selectedIndex];
 
-      // Log the full analysis for debugging
-      console.info('Full analysis:', JSON.stringify(validatedResponse, null, 2));
+  //       // Log the full analysis for debugging
+  //       console.info('Full analysis:', JSON.stringify(validatedResponse, null, 2));
 
-      const response = {
-        biasedArticle: {
-          title: selectedArticle.title,
-          type: validatedResponse.mostBiased.type,
-          reason: validatedResponse.mostBiased.reason
-        }
-      };
+  //       const response = {
+  //         biasedArticle: {
+  //           title: selectedArticle.title,
+  //           type: validatedResponse.mostBiased.type,
+  //           reason: validatedResponse.mostBiased.reason
+  //         }
+  //       };
 
-      console.info('Final response:', response);
-      return response;
-    } catch (error) {
-      console.error('Error parsing analysis:', error);
-      console.error('Raw content:', content);
-      throw new Error('Failed to analyze articles: ' + error.message);
-    }
-  }
+  //       console.info('Final response:', response);
+  //       return response;
+  //     } catch (error) {
+  //       console.error('Error parsing analysis:', error);
+  //       console.error('Raw content:', content);
+  //       throw new Error('Failed to analyze articles: ' + error.message);
+  //     }
+  //   }
 
   private async callLlamaAPI(articles: Articles[]): Promise<Response> {
     return this.llamaService.chatCompletion({
@@ -291,41 +261,6 @@ Return JSON:
     });
   }
 
-  private validateLlamaResponse(data: any): string {
-    if (!data.completion_message?.content?.text) {
-      console.error('Invalid response format:', data);
-      throw new Error('Invalid response format from Llama API');
-    }
-
-    const content = data.completion_message.content.text;
-    console.info('Response content:', content);
-    return content;
-  }
-
-  private parseBiasResponse(content: string): BiasResponse {
-    try {
-      // Parse the content as JSON and validate the structure
-      const parsedContent = JSON.parse(content);
-      if (!parsedContent.biasedArticle) {
-        throw new Error('Invalid response structure: missing biasedArticle');
-      }
-
-      // Validate the required fields
-      const { title, type, reason } = parsedContent.biasedArticle;
-      if (!title || !type || !reason) {
-        throw new Error('Invalid response structure: missing required fields');
-      }
-
-      // Clean up the title by removing extra quotes
-      parsedContent.biasedArticle.title = title.replace(/^"|"$/g, '');
-
-      console.info('Successfully parsed and validated response');
-      return parsedContent as BiasResponse;
-    } catch (e) {
-      console.error('Failed to parse response content:', e);
-      throw new Error('Invalid response format');
-    }
-  }
 
   async detectBiasLlama(articles: Articles[]): Promise<BiasResponse> {
     console.info('Starting bias detection for', articles.length, 'articles');
@@ -335,8 +270,8 @@ Return JSON:
       const data = await response.json();
       console.info('Received response:', JSON.stringify(data, null, 2));
 
-      const content = this.validateLlamaResponse(data);
-      return this.parseBiasResponse(content);
+      const content = this.llamaService.validateLlamaResponse(data);
+      return parseBiasResponse(content);
     } catch (error) {
       console.error('Error processing response:', error);
       throw error;

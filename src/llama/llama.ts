@@ -102,4 +102,15 @@ export class LlamaService {
         console.info(`[DEBUG] Answer:`, answer);
         return answer;
     }
+
+    validateLlamaResponse(data: any): string {
+        if (!data.completion_message?.content?.text) {
+            console.error('Invalid response format:', data);
+            throw new Error('Invalid response format from Llama API');
+        }
+
+        const content = data.completion_message.content.text;
+        console.info('Response content:', content);
+        return content;
+    }
 }
