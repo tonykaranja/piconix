@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FunctionResult } from 'src/openai/types';
 
-interface LlamaMessage {
-    role: "system" | "user" | "assistant";
+export type LlamaMessage = {
+    role: 'system' | 'user' | 'assistant';
     content: string;
-}
+};
 
 interface LlamaRequestConfig {
     messages: LlamaMessage[];

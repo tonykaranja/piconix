@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LlamaService } from './llama/llama';
+import { OpenAIService } from './openai/openai.service';
 import { ConfigService } from '@nestjs/config';
 
 // Mock LlamaService
@@ -37,15 +38,25 @@ describe('AppController', () => {
         AppService,
         {
           provide: LlamaService,
-          useValue: mockLlamaService
+          useValue: {
+            chatCompletion: jest.fn(),
+            extractJsonAnswer: jest.fn(),
+            validateLlamaResponse: jest.fn()
+          }
+        },
+        {
+          provide: OpenAIService,
+          useValue: {
+            chatCompletion: jest.fn(),
+            fetchDbAnswer: jest.fn(),
+            transcribeAudio: jest.fn(),
+            textToSpeech: jest.fn()
+          }
         },
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn((key: string) => {
-              if (key === 'OPENAI_API_KEY') return 'test-openai-key';
-              return null;
-            })
+            get: jest.fn()
           }
         }
       ],
