@@ -1,6 +1,13 @@
 import { PrismaClient } from "@prisma/client";
+import {
+    FunctionDefinition,
+    DriverPositionResult,
+    DriverByPositionResult,
+    ConstructorByPositionResult,
+    FunctionResult
+} from './types';
 
-export const functions = [
+export const functions: FunctionDefinition[] = [
     {
         name: "get_driver_position",
         description: "Get the finishing position of a driver for a given season and round.",
@@ -48,7 +55,7 @@ export async function get_driver_position({ driverName, season, round }: {
     driverName: string;
     season: number;
     round: number;
-}) {
+}): Promise<DriverPositionResult> {
     const [givenName, ...familyParts] = driverName.trim().split(" ");
     const familyName = familyParts.join(" ");
     console.log(`[DEBUG] Searching for driver: givenName='${givenName}', familyName='${familyName}'`);
@@ -59,7 +66,6 @@ export async function get_driver_position({ driverName, season, round }: {
                 { givenName: { equals: givenName, mode: "insensitive" } },
                 { familyName: { equals: familyName, mode: "insensitive" } }
             ]
-
         }
     });
     console.log(`[DEBUG] Found driver:`, driver);
@@ -89,7 +95,7 @@ export async function get_driver_by_position({ position, season, round }: {
     position: number;
     season: number;
     round: number;
-}) {
+}): Promise<DriverByPositionResult> {
     console.log(`[DEBUG] Searching for result: position=${position}, season=${season}, round=${round}`);
     const result = await prisma.result.findFirst({
         where: { position, season, round },
@@ -113,7 +119,7 @@ export async function get_constructor_by_position({ position, season, round }: {
     position: number;
     season: number;
     round: number;
-}) {
+}): Promise<ConstructorByPositionResult> {
     console.log(`[DEBUG] Searching for constructor by result: position=${position}, season=${season}, round=${round}`);
     const result = await prisma.result.findFirst({
         where: { position, season, round },
@@ -131,7 +137,7 @@ export async function get_constructor_by_position({ position, season, round }: {
     };
 }
 
-export async function handleFunctionCall(name: string, args: any) {
+export async function handleFunctionCall(name: string, args: any): Promise<FunctionResult> {
     try {
         switch (name) {
             case "get_driver_position":

@@ -1,33 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import OpenAI from "openai";
-import { config } from 'dotenv';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { Articles, BiasResponse, responseFormat } from './llama/biasDetector.types';
-import { chatWithF1Bot } from './openai/openai';
 import { LlamaService } from './llama/llama';
 import { parseBiasResponse } from './util';
-
-config({ path: '.env' });
-
-// Type-safe environment variables
-const env = {
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY!,
-} as const;
+import { OpenAIService } from './openai/openai.service';
 
 @Injectable()
 export class AppService {
-  private readonly openai: OpenAI;
   private readonly voiceCacheDir: string;
   private readonly prisma: PrismaClient;
 
   constructor(
-    private readonly llamaService: LlamaService
+    private readonly llamaService: LlamaService,
+    private readonly openaiService: OpenAIService
   ) {
-    this.openai = new OpenAI({
-      apiKey: env.OPENAI_API_KEY,
-    });
     this.voiceCacheDir = path.join(process.cwd(), 'voice-cache');
     this.initializeCacheDirectory();
     this.prisma = new PrismaClient();
@@ -57,7 +45,7 @@ export class AppService {
     } catch (error) {
       // File doesn't exist, generate new voice
       console.info(`Generating new voice file for ${name}`);
-      const buffer = await this.textToSpeech({ text: name, instructions: "say the input name" });
+      const buffer = await this.openaiService.textToSpeech({ text: name, instructions: "say the input name" });
 
       // Save to cache
       await fs.writeFile(filePath, buffer);
@@ -66,20 +54,7 @@ export class AppService {
     }
   }
 
-  private async transcribeAudio(file: File): Promise<string> {
-    const transcription = await this.openai.audio.transcriptions.create({
-      file,
-      model: "whisper-1",
-    });
-
-    if (!transcription.text) {
-      throw new Error('Failed to transcribe audio');
-    }
-
-    return transcription.text;
-  }
-
-  private async saveQuestionAnswer(question: string, answer: string): Promise<void> {
+  private async saveQuestionAnswer({ question, answer }: { question: string, answer: string }): Promise<void> {
     const questionAndAnswer = {
       question,
       answer,
@@ -95,15 +70,19 @@ export class AppService {
     }
   }
 
-  private async textToSpeech({ text, instructions }: { text: string, instructions?: string }): Promise<Buffer> {
-    const mp3 = await this.openai.audio.speech.create({
-      model: "gpt-4o-mini-tts",
-      voice: "alloy",
-      input: text,
-      ...(instructions && { instructions }),
+  private async getCachedAnswer(question: string): Promise<Buffer | null> {
+    const questionInDb = await this.prisma.questionAnswer.findFirst({
+      where: {
+        question: question
+      }
     });
 
-    return Buffer.from(await mp3.arrayBuffer());
+    if (questionInDb?.answer) {
+      // Return answer from cache
+      return await fs.readFile(`${this.voiceCacheDir}/${questionInDb.question}.mp3`);
+    }
+
+    return null;
   }
 
   async handleAudioQuestion(audioFile: Express.Multer.File): Promise<Buffer> {
@@ -120,21 +99,33 @@ export class AppService {
       );
 
       // Convert audio file to text using OpenAI's Whisper
-      const question = await this.transcribeAudio(file);
+      const question = await this.openaiService.transcribeAudio(file);
 
-      // Get answer from GPT-4
-      const answer = await chatWithF1Bot({
-        userQuestion: question,
-        openai: this.openai,
-        llamaService: this.llamaService
-      });
+      const cachedAnswer = await this.getCachedAnswer(question);
+      if (cachedAnswer) {
+        return cachedAnswer;
+      }
 
-      // Save question and answer to database
-      await this.saveQuestionAnswer(question, JSON.stringify(answer) || 'No answer');
+      // Get answer from db using GPT-4
+      const dbAnswer = await this.openaiService.fetchDbAnswer({ userQuestion: question });
+
+      if (!dbAnswer.data) {
+        throw new Error('Failed to get answer from db');
+      }
+
+      // extract answer from the response with llama
+      const simpleAnswer = await this.llamaService.extractJsonAnswer({ userQuestion: question, result: dbAnswer.data });
+
+      // Save question and answer log to database
+      await this.saveQuestionAnswer({ question, answer: simpleAnswer });
 
       // Convert answer to speech
-      const buffer = await this.textToSpeech({ text: answer.toString() });
+      const buffer = await this.openaiService.textToSpeech({ text: simpleAnswer });
+
+      // Save answer to cache
       await fs.writeFile(`${this.voiceCacheDir}/${question}.mp3`, buffer);
+
+      // Return answer
       return buffer;
     } catch (error) {
       console.error('Error processing audio question:', error);
@@ -260,7 +251,6 @@ export class AppService {
       response_format: responseFormat
     });
   }
-
 
   async detectBiasLlama(articles: Articles[]): Promise<BiasResponse> {
     console.info('Starting bias detection for', articles.length, 'articles');

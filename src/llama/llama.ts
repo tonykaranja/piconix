@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { FunctionResult } from 'src/openai/types';
 
 interface LlamaMessage {
     role: "system" | "user" | "assistant";
@@ -57,7 +58,7 @@ export class LlamaService {
         return response;
     }
 
-    async processWithLlama({ userQuestion, result }: { userQuestion: string, result: any }): Promise<string> {
+    async extractJsonAnswer({ userQuestion, result }: { userQuestion: string, result: FunctionResult }): Promise<string> {
         const llamaResponse = await this.chatCompletion({
             messages: [
                 {
@@ -93,7 +94,6 @@ export class LlamaService {
         }
 
         const answer: string = llamaData.completion_message.content.text;
-        console.info(`[DEBUG] Processed Answer:`, answer);
 
         if (!answer.trim()) {
             throw new Error("Empty answer generated");

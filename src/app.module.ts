@@ -11,6 +11,7 @@ import * as winston from 'winston';
 import { utilities as nestWinstonModuleUtilities } from 'nest-winston';
 import { PiconixLogTransport } from './middleware/piconix.logger';
 import { HttpAdapterHost } from '@nestjs/core';
+import { OpenAIService } from './openai/openai.service';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { HttpAdapterHost } from '@nestjs/core';
   providers: [
     AppService,
     LlamaService,
+    OpenAIService,
     {
       provide: 'WINSTON_LOGGER',
       useFactory: () => {
