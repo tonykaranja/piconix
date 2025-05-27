@@ -56,4 +56,50 @@ export class LlamaService {
 
         return response;
     }
+
+    async processWithLlama({ userQuestion, result }: { userQuestion: string, result: any }): Promise<string> {
+        const llamaResponse = await this.chatCompletion({
+            messages: [
+                {
+                    role: "system",
+                    content: `
+                You are a expert in extracting information from json data. Given the json with answer data and the original question, extract a clear, concise answer in natural language. Focus on the most relevant information and be direct. Do not include any other information or repeat the question. provide one word answer / fewest words if possible for nouns, names and position numbers or nouns or as need be.
+                Question: 'Who constructed the car that finished in position 5 in round 6 of 2015?' & answer JSON raw ${JSON.stringify({ constructorName: 'Red Bull', constructorId: 'red_bull' })}, answer should be 'Red Bull'.;
+                for questions like Question: 'Who finished in position 8 in round 17 of 2015?' Raw json answer ${JSON.stringify({
+                        driverName: 'Sergio Pérez',
+                        driverId: 'perez',
+                        constructorName: 'Force India',
+                        constructorId: 'force_india'
+                    })}, give name of driver (driverName) only ie 'Sergio Pérez'.;
+                for questions like Question: 'What position did Giancarlo Fisichella finish in round 3 in 2008?' Raw json answer ${JSON.stringify({
+                        position: 12,
+                        constructorName: 'Force India',
+                        constructorId: 'force_india'
+                    })}, give (position) only ie '12th'.;
+                `
+                },
+                {
+                    role: "user",
+                    content: `Question: ${userQuestion}\nRaw json answer data: ${JSON.stringify(result)}\nPlease extract a simple, clear, concise answer in natural language for the question based on the answer data.`
+                }
+            ],
+            temperature: 0.2
+        });
+
+        const llamaData = await llamaResponse.json();
+        console.info(`[DEBUG] Llama Data:`, llamaData);
+        if (!llamaData.completion_message?.content?.text) {
+            throw new Error("No content in Llama response");
+        }
+
+        const answer: string = llamaData.completion_message.content.text;
+        console.info(`[DEBUG] Processed Answer:`, answer);
+
+        if (!answer.trim()) {
+            throw new Error("Empty answer generated");
+        }
+
+        console.info(`[DEBUG] Answer:`, answer);
+        return answer;
+    }
 }

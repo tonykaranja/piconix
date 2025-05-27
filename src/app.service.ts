@@ -5,7 +5,7 @@ import { z } from "zod";
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
-import { Articles, BiasResponse, responseFormat } from './llama/biasDetector';
+import { Articles, BiasResponse, responseFormat } from './llama/biasDetector.types';
 import { chatWithF1Bot } from './openai/openai';
 import { LlamaService } from './llama/llama';
 
