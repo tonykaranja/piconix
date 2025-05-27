@@ -14,6 +14,54 @@ Piconix is a specialized service that combines the power of OpenAI's GPT-4 and L
 - Structured data handling with Prisma ORM
 - Docker support for easy deployment
 
+## Services
+
+### OpenAI Service
+
+The `OpenAIService` provides integration with OpenAI's API, offering the following capabilities:
+
+- **Chat Completion**: Process natural language queries using GPT-4
+- **Database Query**: Extract structured data from the database based on user questions
+- **Audio Transcription**: Convert speech to text using Whisper
+- **Text-to-Speech**: Convert text responses to speech
+
+Example usage:
+```typescript
+@Injectable()
+export class YourService {
+  constructor(private openAIService: OpenAIService) {}
+
+  async processQuery(question: string) {
+    const result = await this.openAIService.fetchDbAnswer({ userQuestion: question });
+    // Process result...
+  }
+}
+```
+
+### Llama Service
+
+The `LlamaService` provides integration with Llama AI, specializing in:
+
+- **Chat Completion**: Process queries using Llama's language model
+- **JSON Answer Extraction**: Extract and format answers from structured data
+- **Response Validation**: Ensure response quality and format
+
+Example usage:
+```typescript
+@Injectable()
+export class YourService {
+  constructor(private llamaService: LlamaService) {}
+
+  async getAnswer(question: string, data: any) {
+    const result = await this.llamaService.extractJsonAnswer({
+      userQuestion: question,
+      result: data
+    });
+    // Process result...
+  }
+}
+```
+
 ## Prerequisites
 
 - Node.js (v16 or higher)
@@ -88,13 +136,18 @@ docker-compose up --build
 
 ## API Usage
 
-The service provides an endpoint for F1 data queries. Here's an example of how to use it:
+The service provides endpoints for F1 data queries. Here's an example of how to use it:
 
 ```typescript
-const response = await chatWithF1Bot({
+// Using OpenAI Service
+const openaiResponse = await openAIService.fetchDbAnswer({
+    userQuestion: "Who won the Monaco Grand Prix in 2023?"
+});
+
+// Using Llama Service
+const llamaResponse = await llamaService.extractJsonAnswer({
     userQuestion: "Who won the Monaco Grand Prix in 2023?",
-    openai: openaiInstance,
-    llamaService: llamaServiceInstance
+    result: openaiResponse.data
 });
 ```
 
@@ -117,7 +170,12 @@ npm run test:cov
 ```
 src/
 ├── llama/           # Llama AI integration
+│   ├── llama.ts     # LlamaService implementation
+│   └── types.ts     # Llama-specific types
 ├── openai/          # OpenAI integration
+│   ├── openai.service.ts  # OpenAIService implementation
+│   ├── functions.ts       # OpenAI function definitions
+│   └── types.ts          # OpenAI-specific types
 ├── prisma/          # Database schema and migrations
 └── test/            # Test files
 ```
