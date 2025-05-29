@@ -1,4 +1,4 @@
-import { BiasResponse } from "./llama/biasDetector.types";
+import { BiasResponse } from "./services/llama/biasDetector.types";
 
 export function parseBiasResponse(content: string): BiasResponse {
     try {

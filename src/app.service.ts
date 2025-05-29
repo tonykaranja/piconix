@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
-import { Articles, BiasResponse, responseFormat } from './llama/biasDetector.types';
-import { LlamaService } from './llama/llama';
+import { Articles, BiasResponse, responseFormat } from './services/llama/biasDetector.types';
+import { LlamaService } from './services/llama/llama';
 import { parseBiasResponse } from './util';
-import { OpenAIService } from './openai/openai.service';
+import { OpenAIService } from './services/openai/openai.service';
 
 @Injectable()
 export class AppService {

@@ -1,6 +1,6 @@
 import * as TransportStream from 'winston-transport';
 import { PrismaClient } from '@prisma/client';
-import { MakejaLog } from './logs.util';
+import { PiconixLog } from './logs.util';
 
 export class PiconixLogTransport extends TransportStream {
 	constructor(opts: any) {
@@ -11,7 +11,7 @@ export class PiconixLogTransport extends TransportStream {
 
 	private prisma: PrismaClient;
 
-	async sendLogs(logInfo: MakejaLog): Promise<void> {
+	async sendLogs(logInfo: PiconixLog): Promise<void> {
 		try {
 			// Create a log entry using Prisma
 			await this.prisma.logs.create({

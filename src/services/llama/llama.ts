@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FunctionResult } from 'src/openai/types';
+import { FunctionResult } from '../openai/types';
 
 export type LlamaMessage = {
     role: 'system' | 'user' | 'assistant';

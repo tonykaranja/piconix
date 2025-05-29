@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { OpenAIService } from './openai.service';
 import { LlamaService } from '../llama/llama';
+import { DbService } from '../db.service';
 import OpenAI from 'openai';
 
 // Mock OpenAI
@@ -37,6 +38,20 @@ const mockConfigService = {
 // Mock the LlamaService
 const mockLlamaService = {
     extractJsonAnswer: jest.fn().mockResolvedValue('Test Answer')
+};
+
+// Mock the DbService
+const mockDbService = {
+    handleOpenAIFunctionCall: jest.fn().mockImplementation((name: string, args: any) => {
+        if (name === 'get_driver_position') {
+            return Promise.resolve({
+                position: 1,
+                constructorName: 'Ferrari',
+                constructorId: 'fer'
+            });
+        }
+        throw new Error(`Unknown function: ${name}`);
+    })
 };
 
 // Mock the functions module
@@ -82,6 +97,10 @@ describe('OpenAIService', () => {
                 {
                     provide: LlamaService,
                     useValue: mockLlamaService
+                },
+                {
+                    provide: DbService,
+                    useValue: mockDbService
                 }
             ],
         }).compile();

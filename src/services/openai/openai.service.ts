@@ -1,19 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-import { functions, handleFunctionCall } from './functions';
+import { functions } from './functions';
 import {
     OpenAIRequestConfig,
     OpenAIResponse,
     FunctionResponse
 } from './types';
+import { DbService } from '../db.service';
 
 @Injectable()
 export class OpenAIService {
     private readonly apiKey: string;
     private readonly openai: OpenAI;
 
-    constructor(private configService: ConfigService) {
+    constructor(private configService: ConfigService, private dbService: DbService) {
         const apiKey = this.configService.get<string>('OPENAI_API_KEY');
         if (!apiKey) {
             throw new Error('OPENAI_API_KEY is not set in environment variables');
@@ -64,7 +65,7 @@ export class OpenAIService {
                 throw new Error("No function call in message");
             }
 
-            const result = await handleFunctionCall(
+            const result = await this.dbService.handleOpenAIFunctionCall(
                 message.function_call.name,
                 JSON.parse(message.function_call.arguments || "{}")
             );

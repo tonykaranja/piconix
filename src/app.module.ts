@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { LlamaService } from './llama/llama';
+import { LlamaService } from './services/llama/llama';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggingInterceptor } from './middleware/logging.interceptor';
 import { AllExceptionsFilter } from './middleware/http-exception.filter';
@@ -11,7 +11,8 @@ import * as winston from 'winston';
 import { utilities as nestWinstonModuleUtilities } from 'nest-winston';
 import { PiconixLogTransport } from './middleware/piconix.logger';
 import { HttpAdapterHost } from '@nestjs/core';
-import { OpenAIService } from './openai/openai.service';
+import { OpenAIService } from './services/openai/openai.service';
+import { DbService } from './services/db.service';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { OpenAIService } from './openai/openai.service';
     AppService,
     LlamaService,
     OpenAIService,
+    DbService,
     {
       provide: 'WINSTON_LOGGER',
       useFactory: () => {

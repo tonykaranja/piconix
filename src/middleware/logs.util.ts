@@ -3,7 +3,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { z } from 'zod';
 import { baseSchema, defaultOmits, jsonSchema as prismaZodJsonSchema } from '../types/common.schema';
 
-const makejaLogSchema = z.object({
+const piconixLogSchema = z.object({
 	userId: z.string(),
 	name: z.string(),
 	code: z.string(),
@@ -15,13 +15,13 @@ const makejaLogSchema = z.object({
 	meta: z.any(),
 });
 
-const getMakejaLogSchema = makejaLogSchema
+const getPiconixLogSchema = piconixLogSchema
 	.omit({
 		id: true,
 		...defaultOmits,
 	})
 	.and(prismaZodJsonSchema.optional());
-export type MakejaLog = z.infer<typeof getMakejaLogSchema>;
+export type PiconixLog = z.infer<typeof getPiconixLogSchema>;
 
 type ExceptionLogInput = {
 	userId: string;
@@ -30,7 +30,7 @@ type ExceptionLogInput = {
 	exception: PrismaClientKnownRequestError | PrismaClientValidationError | HttpException | unknown;
 };
 
-export const formatErrorLogData = (errorDeets: ExceptionLogInput): MakejaLog => {
+export const formatErrorLogData = (errorDeets: ExceptionLogInput): PiconixLog => {
 	const { userId, path, statusCode, exception } = errorDeets;
 	const timestamp = new Date().toISOString();
 	switch (true) {
